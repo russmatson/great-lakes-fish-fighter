@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Great Lakes Fish Fighter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a1a2a;font-family:Georgia,serif;color:#e8f4f8;overflow:hidden;}
+#gameContainer{width:900px;height:550px;margin:0 auto;position:relative;}
+canvas{display:block;}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,10,20,0.93);}
+#ui h1{font-size:2.2em;color:#00cfff;text-shadow:0 0 15px #0088cc;margin-bottom:8px;text-align:center;}
+#ui h2{font-size:1.4em;color:#ff8c00;margin-bottom:14px;text-align:center;}
+#ui p{font-size:1em;color:#c8e8f0;margin-bottom:10px;text-align:center;max-width:700px;line-height:1.5;}
+.qText{font-size:1.1em;color:#fff8dc;margin-bottom:16px;text-align:center;max-width:720px;line-height:1.5;font-weight:bold;}
+.choiceBtn{display:block;width:680px;margin:5px auto;padding:9px 14px;background:#0a2a3a;border:2px solid #0088cc;color:#c8e8f0;font-family:Georgia,serif;font-size:0.95em;cursor:pointer;border-radius:4px;text-align:left;transition:background 0.2s;}
+.choiceBtn:hover{background:#0a4a6a;color:#00cfff;}
+#bigBtn{padding:14px 36px;font-size:1.2em;background:#8b0000;border:2px solid #ff4400;color:#ffd700;font-family:Georgia,serif;cursor:pointer;border-radius:6px;margin-top:14px;}
+#bigBtn:hover{background:#cc0000;}
+#fb{font-size:1.1em;margin:10px 0;min-height:26px;font-weight:bold;}
+#fb.ok{color:#00ff88;}
+#fb.bad{color:#ff4444;}
+#hud{position:absolute;top:0;left:0;width:100%;height:36px;background:rgba(0,0,0,0.7);display:flex;align-items:center;padding:0 12px;gap:18px;pointer-events:none;}
+#hud span{font-size:0.9em;color:#00cfff;}
+#oneliner{position:absolute;bottom:48px;left:0;width:100%;text-align:center;font-size:1em;color:#ffd700;text-shadow:1px 1px 3px #000;pointer-events:none;opacity:0;transition:opacity 0.4s;}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="c" width="900" height="550"></canvas>
+  <div id="hud"><span id="hpBar">HP: 100</span><span id="scoreBar">Score: 0</span><span id="wepBar">Fish: Walleye</span><span id="waveBar">Wave 1</span></div>
+  <div id="oneliner"></div>
+  <div id="ui"></div>
+</div>
+<script>
+var FISH_TYPES=[
+  {id:"walleye",name:"Walleye",type:"melee",color:"#c8a060",dmg:25,range:70,desc:"Smack em with a walleye!"},
+  {id:"salmon",name:"King Salmon",type:"explode",color:"#e06030",dmg:50,range:120,desc:"BOOM goes the salmon!"},
+  {id:"pike",name:"Northern Pike",type:"poison",color:"#608040",dmg:15,range:90,desc:"Toxic pike gas!"},
+  {id:"perch",name:"Yellow Perch",type:"melee",color:"#e0c020",dmg:18,range:60,desc:"Perchin your face!"},
+  {id:"muskie",name:"Muskie",type:"melee",color:"#906850",dmg:35,range:80,desc:"Muskie to the skull!"}
+];
+var ONELINERS=[
+  "You picked the wrong lake, pal! - Michigan",
+  "Wisconsin dairy farmers hit harder than that!",
+  "Ohio: We gave you rock and roll. Get FISH'd!",
+  "Minnesota nice? Not today!",
+  "Indiana: corn AND an uppercut!",
+  "Pennsylvania steelworkers approve this fish!",
+  "New York: we got 99 problems, you are all of them!",
+  "Lake Erie fish slap with INDUSTRIAL STRENGTH!",
+  "Huron heard the CRUNCH from Canada!",
+  "Superior? More like INFERIOR now!",
+  "Chicago deep dish of PAIN coming up!",
+  "Traverse City called - they want their fish back!",
+  "Toledo is ANGRY and so is this walleye!",
+  "The UP sends its regards via this muskie!",
+  "Buffalo wings? Try Buffalo FISH FIST!",
+  "Detroit built this fish-smack UNION STRONG!",
+  "Cleveland rocks and this salmon EXPLODES!",
+  "Green Bay? More like Red Face Bay for you!",
+  "Pictured Rocks - now picturing your defeat!",
+  "Mackinac Bridge? More like Mackinac SMUDGE!"
+];
+var MCAS_SCIENCE=[
+  {q:"What is the powerhouse of the cell?",a:["Mitochondria","Nucleus","Ribosome","Vacuole"],c:0},
+  {q:"What is the chemical formula for water?",a:["H2O","CO2","NaCl","O2"],c:0},
+  {q:"Which planet is closest to the Sun?",a:["Mercury","Venus","Earth","Mars"],c:0},
+  {q:"What force pulls objects toward Earth?",a:["Gravity","Magnetism","Friction","Tension"],c:0},
+  {q:"What is the process by which plants make food using sunlight?",a:["Photosynthesis","Respiration","Fermentation","Digestion"],c:0},
+  {q:"What type of rock is formed from cooled magma or lava?",a:["Igneous","Sedimentary","Metamorphic","Limestone"],c:0},
+  {q:"What is the basic unit of life?",a:["Cell","Atom","Molecule","Organ"],c:0},
+  {q:"What gas do plants absorb during photosynthesis?",a:["Carbon dioxide","Oxygen","Nitrogen","Hydrogen"],c:0},
+  {q:"What is the speed of light (approximately)?",a:["300,000 km/s","150,000 km/s","30,000 km/s","3,000 km/s"],c:0},
+  {q:"What organelle controls the activities of a cell?",a:["Nucleus","Ribosome","Lysosome","Golgi apparatus"],c:0},
+  {q:"What type of energy does a moving object have?",a:["Kinetic energy","Potential energy","Chemical energy","Thermal energy"],c:0},
+  {q:"DNA stands for:",a:["Deoxyribonucleic acid","Dinitrogen oxide acid","Dynamic nucleic agent","Dipolar nitrogen acid"],c:0},
+  {q:"What layer of Earth do we live on?",a:["Crust","Mantle","Outer core","Inner core"],c:0},
+  {q:"What is the atomic number of carbon?",a:["6","12","8","14"],c:0},
+  {q:"Sound travels fastest through which medium?",a:["Solids","Liquids","Gases","Vacuum"],c:0},
+  {q:"What is the law of conservation of energy?",a:["Energy cannot be created or destroyed","Energy equals mass times acceleration","Every action has an equal reaction","Energy is always kinetic"],c:0}
+];
+var gState="title",score=0,hp=100,wave=1;
+var currentFishIdx=0;
+var enemies=[],projectiles=[],particles=[],clouds=[];
+var hero={x:120,y:420,w:36,h:52,vx:0,vy:0,onG:true,facing:1,attackTimer:0,juggleAngle:0};
+var GROUND=470,W=900,H=550;
+var keys={};
+var frameCount=0,onelinerTimer=0;
+var qDeck=[],qIdx=0,funeralPhase=false;
+var coffins=[],graves=[];
+var canvas=document.getElementById("c");
+var ctx=canvas.getContext("2d");
+var ui=document.getElementById("ui");
+var hpBar=document.getElementById("hpBar");
+var scoreBar=document.getElementById("scoreBar");
+var wepBar=document.getElementById("wepBar");
+var waveBar=document.getElementById("waveBar");
+var olEl=document.getElementById("oneliner");
+var iFrames=0;
+
+function shuffle(a){var b=a.slice();for(var i=b.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=b[i];b[i]=b[j];b[j]=t;}return b;}
+function setUI(h){ui.style.display="flex";ui.innerHTML=h;}
+function hideUI(){ui.style.display="none";}
+function rnd(n){return Math.floor(Math.random()*n);}
+function showOneliner(txt){olEl.textContent=txt;olEl.style.opacity="1";onelinerTimer=180;}
+function curFish(){return FISH_TYPES[currentFishIdx%FISH_TYPES.length];}
+
+function showTitle(){
+  gState="title";
+  setUI("<h1>Great Lakes Fish Fighter</h1>"
+    +"<h2>Juggle Fish. Smack Canadians. Attend Funerals.</h2>"
+    +"<p>Our hero juggles mighty Great Lakes fish and uses them as weapons against the evil Canadian menace. Walleye for melee, King Salmon EXPLODES, Northern Pike releases toxic gas!</p>"
+    +"<p style=\"color:#ffd700\">Arrow keys/WASD = move/jump &amp;nbsp; A = Attack &amp;nbsp; Q/E = switch fish</p>"
+    +"<p style=\"color:#00cfff\">After victory: attend the funeral and answer MCAS Science questions.<br>Get one wrong and the Canadians RISE FROM THEIR COFFINS.</p>"
+    +"<button id=\"bigBtn\">FIGHT FOR THE GREAT LAKES!</button>");
+  document.getElementById("bigBtn").onclick=startGame;
+}
+
+function startGame(){
+  gState="combat";
+  score=0;hp=100;wave=1;currentFishIdx=0;
+  hero={x:120,y:GROUND-52,w:36,h:52,vx:0,vy:0,onG:true,facing:1,attackTimer:0,juggleAngle:0};
+  enemies=[];projectiles=[];particles=[];coffins=[];graves=[];
+  iFrames=0;frameCount=0;
+  spawnWave();
+  hideUI();
+  updHUD();
+}
+
+function spawnWave(){
+  var count=3+wave*2;
+  for(var i=0;i<count;i++){
+    enemies.push({
+      x:W-80-i*90,y:GROUND-48,w:34,h:48,hp:40+wave*10,
+      vx:0,vy:0,onG:true,state:"walk",timer:rnd(60),
+      color:"#cc3333",hitTimer:0,
+      type:rnd(3) // 0=walker,1=charger,2=jumper
+    });
+  }
+  showOneliner(ONELINERS[rnd(ONELINERS.length)]);
+  waveBar.textContent="Wave "+wave;
+}
+
+function spawnParticle(x,y,col,count,speed){
+  for(var i=0;i<(count||8);i++){
+    var a=Math.random()*Math.PI*2;
+    var s=(speed||3)*Math.random()+1;
+    particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:30+rnd(20),color:col,size:rnd(5)+3});
+  }
+}
+
+function doAttack(){
+  var fish=curFish();
+  hero.attackTimer=25;
+  var fx=hero.x+(hero.facing>0?hero.w+10:-30);
+  var fy=hero.y+20;
+  if(fish.type==="melee"){
+    // Check enemies in range
+    for(var i=0;i<enemies.length;i++){
+      var e=enemies[i];
+      var dist=Math.abs((e.x+17)-(hero.x+18));
+      if(dist<fish.range+20 && e.x*hero.facing>=hero.x*hero.facing-40){
+        e.hp-=fish.dmg;
+        e.hitTimer=20;
+        e.vx=hero.facing*8;
+        e.vy=-4;
+        spawnParticle(e.x+17,e.y+10,"#ff8800",10,5);
+        if(e.hp<=0){
+          killEnemy(i);
+          i--;
+        }
+      }
+    }
+  } else if(fish.type==="explode"){
+    // Launch projectile
+    projectiles.push({x:fx,y:fy,vx:hero.facing*9,vy:-2,type:"explode",color:fish.color,fish:fish,life:60,w:16,h:10});
+  } else if(fish.type==="poison"){
+    // Launch gas cloud
+    projectiles.push({x:fx,y:fy,vx:hero.facing*5,vy:-1,type:"poison",color:fish.color,fish:fish,life:80,w:14,h:10});
+  }
+}
+
+function killEnemy(idx){
+  var e=enemies[idx];
+  spawnParticle(e.x+17,e.y+10,"#ff0000",15,6);
+  score+=100;
+  if(rnd(3)===0) showOneliner(ONELINERS[rnd(ONELINERS.length)]);
+  enemies.splice(idx,1);
+  scoreBar.textContent="Score: "+score;
+  if(enemies.length===0){
+    wave++;
+    if(wave>4) startFuneral();
+    else {setTimeout(spawnWave,1500);}
+  }
+}
+
+function startFuneral(){
+  gState="funeral";
+  // Set up coffins and graves
+  coffins=[];
+  graves=[];
+  for(var i=0;i<5;i++){
+    coffins.push({x:100+i*150,y:GROUND-60,open:false,occupied:true,openTimer:0});
+    graves.push({x:140+i*150,y:GROUND-20,cracked:false,occupied:true});
+  }
+  enemies=[];projectiles=[];particles=[];
+  qDeck=shuffle(MCAS_SCIENCE.slice());
+  qIdx=0;
+  setTimeout(showFuneralIntro,500);
+}
+
+function showFuneralIntro(){
+  setUI("<h1>The Funeral</h1>"
+    +"<h2>You defeated them... for now.</h2>"
+    +"<p>The evil Canadians lie in their coffins. Show respect by answering 8th grade science questions.<br><em style=\"color:#ff4444\">Get one wrong and they RISE FROM THE DEAD!</em></p>"
+    +"<button id=\"bigBtn\">Begin the Ceremony</button>");
+  document.getElementById("bigBtn").onclick=nextFuneralQ;
+}
+
+function nextFuneralQ(){
+  if(qIdx>=8){
+    showVictory();
+    return;
+  }
+  var q=qDeck[qIdx];
+  var sa=shuffle(q.a.map(function(t,i){return {t:t,c:i===q.c};}));
+  var h="<h2>Funeral Science Question "+(qIdx+1)+" / 8</h2>"
+    +"<div class=\"qText\">" +q.q+"</div>";
+  for(var i=0;i<sa.length;i++)h+="<button class=\"choiceBtn\" data-c=\""+sa[i].c+"\">"+String.fromCharCode(65+i)+". "+sa[i].t+"</button>";
+  h+="<div id=\"fb\"></div>";
+  setUI(h);
+  document.querySelectorAll(".choiceBtn").forEach(function(b){
+    b.onclick=function(){
+      var correct=this.getAttribute("data-c")==="true";
+      var fb=document.getElementById("fb");
+      document.querySelectorAll(".choiceBtn").forEach(function(x){x.disabled=true;});
+      if(correct){
+        fb.className="ok";fb.textContent="Correct! They stay dead... for now.";
+        qIdx++;
+        setTimeout(nextFuneralQ,1100);
+      } else {
+        fb.className="bad";fb.textContent="WRONG! THE DEAD RISE!";
+        setTimeout(riseFromDead,1200);
+      }
+    };
+  });
+}
+
+function riseFromDead(){
+  gState="combat";
+  hideUI();
+  enemies=[];
+  var count=3+wave;
+  for(var i=0;i<coffins.length;i++){
+    if(coffins[i].occupied){
+      coffins[i].open=true;
+      coffins[i].openTimer=30;
+    }
+  }
+  for(var i=0;i<count;i++){
+    var cx=coffins[i%coffins.length];
+    enemies.push({
+      x:cx.x,y:GROUND-48,w:34,h:48,hp:60+wave*10,
+      vx:0,vy:-8,onG:false,state:"walk",timer:rnd(60),
+      color:"#8822aa",hitTimer:0,type:rnd(3)
+    });
+  }
+  showOneliner("They rise from their GRAVES! This is NOT polite!");
+  updHUD();
+}
+
+function showVictory(){
+  gState="win";
+  setUI("<h1>GREAT LAKES VICTORIOUS!</h1>"
+    +"<h2>The Canadians rest in peace. For now.</h2>"
+    +"<p>You answered all the science questions correctly, the fish are returned to the lake, and Michigan breathes a sigh of relief.</p>"
+    +"<p style=\"color:#ffd700;font-size:1.3em\">Final Score: "+score+"</p>"
+    +"<button id=\"bigBtn\">Play Again</button>");
+  document.getElementById("bigBtn").onclick=function(){hp=100;score=0;wave=1;showTitle();};
+}
+
+function showGameOver(){
+  gState="gameover";
+  setUI("<h1>GAME OVER</h1>"
+    +"<h2>The Canadians have prevailed. Ontario weeps with joy.</h2>"
+    +"<p style=\"color:#ffd700;font-size:1.2em\">Score: "+score+"</p>"
+    +"<button id=\"bigBtn\">Try Again</button>");
+  document.getElementById("bigBtn").onclick=function(){hp=100;score=0;wave=1;showTitle();};
+}
+
+function updHUD(){
+  hpBar.textContent="HP: "+hp;
+  scoreBar.textContent="Score: "+score;
+  wepBar.textContent="Fish: "+curFish().name;
+  waveBar.textContent="Wave "+wave;
+}
+
+// key listeners below
+
+function updateGame(){
+  frameCount++;
+  if(onelinerTimer>0){onelinerTimer--;if(onelinerTimer===0)olEl.style.opacity="0";}
+  if(iFrames>0)iFrames--;
+
+  // Hero movement
+  var spd=4;
+  hero.vx=0;
+  if(keys["ArrowLeft"]||keys["a"]||keys["A"]){hero.vx=-spd;hero.facing=-1;}
+  if(keys["ArrowRight"]||keys["d"]||keys["D"]){hero.vx=spd;hero.facing=1;}
+  if((keys["ArrowUp"]||keys["w"]||keys["W"])&&hero.onG){hero.vy=-13;hero.onG=false;}
+  if(keys["q"]||keys["Q"]){currentFishIdx--;updHUD();keys["q"]=false;keys["Q"]=false;}
+  if(keys["e"]||keys["E"]){currentFishIdx++;updHUD();keys["e"]=false;keys["E"]=false;}
+  if((keys["a"]===undefined||keys["a"]===false)&&(keys["A"]===undefined||keys["A"]===false)){
+    // a for attack - but a also moves left, use z for attack
+  }
+  if(keys["z"]||keys["Z"]||keys["Enter"]){
+    if(hero.attackTimer<=0){doAttack();keys["z"]=false;keys["Z"]=false;keys["Enter"]=false;}
+  }
+  if(hero.attackTimer>0)hero.attackTimer--;
+
+  hero.vy+=0.6;
+  hero.x+=hero.vx;
+  hero.y+=hero.vy;
+  if(hero.y>=GROUND-hero.h){hero.y=GROUND-hero.h;hero.vy=0;hero.onG=true;}
+  hero.x=Math.max(10,Math.min(W-hero.w-10,hero.x));
+  hero.juggleAngle+=0.12;
+
+  // Update enemies
+  for(var i=0;i<enemies.length;i++){
+    var e=enemies[i];
+    if(e.hitTimer>0)e.hitTimer--;
+    e.vy+=0.55;
+    // AI
+    var dx=(hero.x+18)-(e.x+17);
+    if(Math.abs(dx)>60){
+      var spd2=e.type===1?2.5:(e.type===2?1.8:1.4);
+      e.vx=(dx>0?1:-1)*spd2;
+    } else {
+      e.vx=0;
+      // Touch hero
+      if(iFrames===0){
+        hp-=8;iFrames=60;updHUD();
+        spawnParticle(hero.x+18,hero.y+20,"#ff2222",6,4);
+        if(hp<=0){showGameOver();return;}
+      }
+    }
+    if(e.type===2&&e.onG&&rnd(120)===0){e.vy=-11;e.onG=false;}
+    e.x+=e.vx;
+    e.y+=e.vy;
+    if(e.y>=GROUND-e.h){e.y=GROUND-e.h;e.vy=0;e.onG=true;}
+    e.x=Math.max(0,Math.min(W-e.w,e.x));
+  }
+
+  // Update projectiles
+  for(var i=projectiles.length-1;i>=0;i--){
+    var p=projectiles[i];
+    p.x+=p.vx;
+    p.y+=p.vy;
+    p.life--;
+    if(p.life<=0||p.x<-20||p.x>W+20){
+      if(p.type==="explode"&&p.life<=0){
+        spawnParticle(p.x,p.y,"#ff6600",20,8);
+        spawnParticle(p.x,p.y,"#ffcc00",10,5);
+        // Blast nearby enemies
+        for(var j=enemies.length-1;j>=0;j--){
+          var e2=enemies[j];
+          if(Math.abs(p.x-(e2.x+17))<80&&Math.abs(p.y-(e2.y+20))<60){
+            e2.hp-=p.fish.dmg;e2.hitTimer=20;
+            if(e2.hp<=0){killEnemy(j);}
+          }
+        }
+      }
+      projectiles.splice(i,1);
+      continue;
+    }
+    // Poison lingers
+    if(p.type==="poison"){
+      if(frameCount%8===0)spawnParticle(p.x,p.y,p.color,3,1);
+      for(var j=enemies.length-1;j>=0;j--){
+        var e2=enemies[j];
+        if(Math.abs(p.x-(e2.x+17))<50&&Math.abs(p.y-(e2.y+20))<50){
+          if(frameCount%12===0){e2.hp-=p.fish.dmg/6;e2.hitTimer=10;e2.color="#668844";}
+          if(e2.hp<=0){killEnemy(j);}
+        }
+      }
+    }
+    // Explode hits on contact
+    if(p.type==="explode"){
+      for(var j=enemies.length-1;j>=0;j--){
+        var e2=enemies[j];
+        if(Math.abs(p.x-(e2.x+17))<30&&Math.abs(p.y-(e2.y+20))<40){
+          spawnParticle(p.x,p.y,"#ff6600",20,8);
+          e2.hp-=p.fish.dmg;e2.hitTimer=20;
+          if(e2.hp<=0)killEnemy(j);
+          projectiles.splice(i,1);
+          break;
+        }
+      }
+    }
+  }
+
+  // Particles
+  for(var i=particles.length-1;i>=0;i--){
+    var pt=particles[i];
+    pt.x+=pt.vx;pt.y+=pt.vy;pt.vy+=0.15;pt.life--;
+    if(pt.life<=0)particles.splice(i,1);
+  }
+}
+
+function drawBG(){
+  // Sky gradient
+  var sky=ctx.createLinearGradient(0,0,0,GROUND);
+  sky.addColorStop(0,"#0a1535");sky.addColorStop(1,"#1a4a6a");
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,GROUND);
+  // Lake
+  ctx.fillStyle="#0a2a4a";ctx.fillRect(0,GROUND,W,H-GROUND);
+  // Water shimmer
+  ctx.fillStyle="rgba(0,180,255,0.15)";
+  for(var i=0;i<10;i++){ctx.fillRect(i*90+Math.sin(frameCount*0.05+i)*8,GROUND+5,60,4);}
+  // Ground
+  ctx.fillStyle="#1a3a1a";ctx.fillRect(0,GROUND,W,8);
+  // Distant trees
+  ctx.fillStyle="#0a1a0a";
+  for(var i=0;i<8;i++){ctx.fillRect(50+i*110,GROUND-50,12,50);ctx.beginPath();ctx.arc(56+i*110,GROUND-65,18,0,Math.PI*2);ctx.fill();}
+  // Canadian flag silhouettes in bg (humorous)
+  ctx.fillStyle="rgba(200,0,0,0.12)";
+  ctx.font="40px Arial";ctx.fillText("🍁",800,80);ctx.fillText("🍁",820,200);
+}
+
+function drawFuneralBG(){
+  var sky=ctx.createLinearGradient(0,0,0,GROUND);
+  sky.addColorStop(0,"#050510");sky.addColorStop(1,"#1a1a2a");
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,GROUND);
+  ctx.fillStyle="#0a0a10";ctx.fillRect(0,GROUND,W,H-GROUND);
+  ctx.fillStyle="#1a1a1a";ctx.fillRect(0,GROUND,W,8);
+  // Moon
+  ctx.fillStyle="#ffe0a0";ctx.beginPath();ctx.arc(820,60,35,0,Math.PI*2);ctx.fill();
+  // Coffins and graves
+  for(var i=0;i<coffins.length;i++){
+    var cof=coffins[i];
+    ctx.fillStyle=cof.open?"#4a2200":"#2a1200";
+    ctx.fillRect(cof.x,cof.y,80,55);
+    ctx.strokeStyle="#8b4513";ctx.lineWidth=2;
+    ctx.strokeRect(cof.x,cof.y,80,55);
+    if(cof.open){
+      ctx.fillStyle="#000";
+      ctx.fillRect(cof.x+5,cof.y+5,70,45);
+    }
+    // Cross
+    ctx.fillStyle="#888";ctx.fillRect(graves[i].x+14,graves[i].y-50,6,50);ctx.fillRect(graves[i].x+4,graves[i].y-42,26,6);
+    ctx.font="9px Georgia";ctx.fillStyle="#666";
+    ctx.fillText("R.I.P.",graves[i].x+2,graves[i].y-8);
+  }
+}
+
+function drawHero(){
+  var hx=hero.x,hy=hero.y;
+  // Body
+  ctx.fillStyle=hero.attackTimer>0?"#e0a000":"#2060a0";
+  ctx.fillRect(hx,hy+18,hero.w,hero.h-18);
+  // Head
+  ctx.fillStyle="#d4a070";ctx.fillRect(hx+6,hy,24,20);
+  // Hat - fishing hat!
+  ctx.fillStyle="#806020";ctx.fillRect(hx+4,hy-10,28,12);ctx.fillRect(hx-2,hy,40,5);
+  // Arms
+  ctx.fillStyle="#2060a0";ctx.fillRect(hx-8,hy+20,10,20);ctx.fillRect(hx+hero.w-2,hy+20,10,20);
+  // Legs
+  ctx.fillStyle="#103060";ctx.fillRect(hx+4,hy+hero.h-14,12,16);ctx.fillRect(hx+hero.w-16,hy+hero.h-14,12,16);
+  // Juggled fish above head!
+  var fish=curFish();
+  var jx=hx+hero.w/2+Math.cos(hero.juggleAngle)*22;
+  var jy=hy-18+Math.sin(hero.juggleAngle*1.3)*12;
+  ctx.fillStyle=fish.color;
+  ctx.beginPath();ctx.ellipse(jx,jy,14,6,hero.juggleAngle,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,0.6)";ctx.beginPath();ctx.ellipse(jx-3,jy-2,4,2,0,0,Math.PI*2);ctx.fill();
+}
+
+function drawEnemies(){
+  for(var i=0;i<enemies.length;i++){
+    var e=enemies[i];
+    var col=e.hitTimer>0?"#ffffff":e.color;
+    // Body
+    ctx.fillStyle=col;ctx.fillRect(e.x,e.y+16,e.w,e.h-16);
+    // Head
+    ctx.fillStyle=e.hitTimer>0?"#ffaaaa":"#d4a070";ctx.fillRect(e.x+4,e.y,26,18);
+    // Toque (Canadian hat!)
+    ctx.fillStyle=e.hitTimer>0?"#ffffff":"#cc0000";
+    ctx.fillRect(e.x+3,e.y-12,28,14);
+    ctx.fillStyle="#ffffff";ctx.fillRect(e.x+3,e.y-14,28,4);
+    // Pompom
+    ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(e.x+17,e.y-15,5,0,Math.PI*2);ctx.fill();
+    // HP bar
+    var maxHp=40+wave*10;
+    ctx.fillStyle="#400";ctx.fillRect(e.x,e.y-20,e.w,5);
+    ctx.fillStyle="#f00";ctx.fillRect(e.x,e.y-20,e.w*(Math.max(0,e.hp)/maxHp),5);
+    // Legs
+    ctx.fillStyle="#880000";ctx.fillRect(e.x+4,e.y+e.h-12,10,14);ctx.fillRect(e.x+e.w-14,e.y+e.h-12,10,14);
+  }
+}
+
+function drawProjectiles(){
+  for(var i=0;i<projectiles.length;i++){
+    var p=projectiles[i];
+    ctx.fillStyle=p.color;
+    if(p.type==="explode"){
+      ctx.beginPath();ctx.ellipse(p.x,p.y,14,7,Math.atan2(p.vy,p.vx),0,Math.PI*2);ctx.fill();
+      // Fuse spark
+      ctx.fillStyle="#ffff00";ctx.beginPath();ctx.arc(p.x-12,p.y,4,0,Math.PI*2);ctx.fill();
+    } else if(p.type==="poison"){
+      ctx.globalAlpha=0.7;
+      ctx.beginPath();ctx.arc(p.x,p.y,12,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.fillStyle="rgba(200,255,100,0.5)";
+      ctx.beginPath();ctx.arc(p.x+5,p.y-5,8,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+function drawParticles(){
+  for(var i=0;i<particles.length;i++){
+    var pt=particles[i];
+    ctx.globalAlpha=pt.life/50;
+    ctx.fillStyle=pt.color;
+    ctx.fillRect(pt.x-pt.size/2,pt.y-pt.size/2,pt.size,pt.size);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawCombatHints(){
+  ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillRect(0,H-28,W,28);
+  ctx.fillStyle="#88ccff";ctx.font="12px Georgia";
+  ctx.fillText("Move: WASD/Arrows | Jump: W/Up | ATTACK: Z/Enter | Switch Fish: Q/E",20,H-10);
+}
+
+function gameLoop(){
+  ctx.clearRect(0,0,W,H);
+  if(gState==="combat"||gState==="funeral"){
+    if(gState==="combat"){
+      drawBG();
+      updateGame();
+      drawParticles();
+      drawProjectiles();
+      drawEnemies();
+      drawHero();
+      drawCombatHints();
+    } else {
+      drawFuneralBG();
+      drawParticles();
+      drawHero();
+    }
+  } else {
+    ctx.fillStyle="#0a1535";ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(0,180,255,0.08)";
+    for(var i=0;i<20;i++)ctx.fillRect((i*137+frameCount)%W,(i*97)%300,2,2);
+    frameCount++;
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener("keydown",function(e){keys[e.key]=true;if([" ","ArrowUp","ArrowDown"].includes(e.key))e.preventDefault();},true);
+window.addEventListener("keyup",function(e){keys[e.key]=false;},true);
+
+showTitle();
+gameLoop();
+</script>
+</body>
+</html>
